@@ -11,7 +11,7 @@ phases:
   build:
     commands:
       - echo Zipping Lambda functions...
-      - zip -r latest-backend.zip src/handlers/ node_modules package.json
+      - zip -r latest-backend.zip src/handlers/ src/utils/ node_modules package.json
 
   post_build:
     commands:

@@ -115,7 +115,7 @@ Resources:
   UpdateProfileImageFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: UploadImage
+      FunctionName: UpdateProfileImage
       Runtime: nodejs18.x
       Handler: src/handlers/updateProfileImage.handler
       Role: !GetAtt LambdaExecutionRole.Arn

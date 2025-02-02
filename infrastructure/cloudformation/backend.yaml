@@ -64,7 +64,7 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: my-backend-lambda-code-bucket
-        S3Key: auth-app.zip
+        S3Key: latest-backend.zip
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -78,7 +78,7 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: my-backend-lambda-code-bucket
-        S3Key: auth-app.zip
+        S3Key: latest-backend.zip
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -92,7 +92,7 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: my-backend-lambda-code-bucket
-        S3Key: auth-app.zip
+        S3Key: latest-backend.zip
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
@@ -106,7 +106,22 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         S3Bucket: my-backend-lambda-code-bucket
-        S3Key: auth-app.zip
+        S3Key: latest-backend.zip
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          BUCKET_NAME: !Ref ProfileImageBucket
+
+  UpdateProfileImageFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UploadImage
+      Runtime: nodejs18.x
+      Handler: src/handlers/updateProfileImage.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: my-backend-lambda-code-bucket
+        S3Key: latest-backend.zip
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable

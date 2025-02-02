@@ -115,6 +115,7 @@ exports.handler = async (event) => {
         name,
         message: "User registered successfully",
       }),
+      headers,
     };
   } catch (error) {
     console.error("Signup error:", error);

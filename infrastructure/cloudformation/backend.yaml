@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+  ### DynamoDB Table ###
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Users
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  ### S3 Bucket ###
+  ProfileImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: bucket-for-profile-images
+      AccessControl: Private
+
+  ### Lambda Role ###
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AuthLambdaRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaDynamoDBS3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt UsersTable.Arn
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::bucket-for-profile-images/*"
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: "*"
+
+  ### Lambda Functions ###
+  SignupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: Signup
+      Runtime: nodejs18.x
+      Handler: src/handlers/signup.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: my-backend-lambda-code-bucket
+        S3Key: auth-app.zip
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+
+  LoginFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: Login
+      Runtime: nodejs18.x
+      Handler: src/handlers/login.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: my-backend-lambda-code-bucket
+        S3Key: auth-app.zip
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+
+  GetProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GetProfile
+      Runtime: nodejs18.x
+      Handler: src/handlers/getProfile.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: my-backend-lambda-code-bucket
+        S3Key: auth-app.zip
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+
+  UploadImageFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: UploadImage
+      Runtime: nodejs18.x
+      Handler: src/handlers/uploadImage.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: my-backend-lambda-code-bucket
+        S3Key: auth-app.zip
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          BUCKET_NAME: !Ref ProfileImageBucket
+
+  ### API Gateway ###
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: AuthAPI
+
+  SignupResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: signup
+      RestApiId: !Ref ApiGateway
+
+  SignupMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      ResourceId: !Ref SignupResource
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SignupFunction.Arn}/invocations"
+
+  ### Cognito User Pool ###
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: AuthUserPool
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: AuthUserPoolClient
+      UserPoolId: !Ref CognitoUserPool
+
+  CognitoAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: CognitoAuthorizer
+      RestApiId: !Ref ApiGateway
+      Type: COGNITO_USER_POOLS
+      IdentitySource: method.request.header.Authorization
+      ProviderARNs:
+        - !GetAtt CognitoUserPool.Arn
+
+  ### CloudFormation Execution Role ###
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudFormationExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:CreateFunction
+                  - lambda:InvokeFunction
+                  - lambda:GetFunction
+                  - lambda:UpdateFunctionCode
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: "*"

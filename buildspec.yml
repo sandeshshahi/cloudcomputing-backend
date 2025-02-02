@@ -17,6 +17,12 @@ phases:
     commands:
       - echo Uploading latest-backend.zip to S3...
       - aws s3 cp latest-backend.zip s3://my-backend-lambda-code-bucket/
+      - echo Updating Lambda function code...
+      - aws lambda update-function-code --function-name Signup --s3-bucket my-backend-lambda-code-bucket --s3-key latest-backend.zip
+      - aws lambda update-function-code --function-name Login --s3-bucket my-backend-lambda-code-bucket --s3-key latest-backend.zip
+      - aws lambda update-function-code --function-name GetProfile --s3-bucket my-backend-lambda-code-bucket --s3-key latest-backend.zip
+      - aws lambda update-function-code --function-name UploadImage --s3-bucket my-backend-lambda-code-bucket --s3-key latest-backend.zip
+      - aws lambda update-function-code --function-name UpdateProfileImage --s3-bucket my-backend-lambda-code-bucket --s3-key latest-backend.zip
 
 artifacts:
   files:

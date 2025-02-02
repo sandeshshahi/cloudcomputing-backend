@@ -55,7 +55,7 @@ exports.handler = async (event) => {
       Bucket: BUCKET_NAME,
       Key: key,
       ContentType: contentType,
-      Expires: 300, // URL expires in 60 seconds
+      Expires: 300, // URL expires in 5min
     };
 
     const uploadURL = await S3.getSignedUrlPromise("putObject", params);

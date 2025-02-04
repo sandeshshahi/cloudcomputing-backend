@@ -13,8 +13,8 @@ const headers = {
 
 exports.handler = async (event) => {
   try {
-    // const { email, imageUrl } = JSON.parse(event.body);
-    const { filePath } = JSON.parse(event.body);
+    const { email, filePath } = JSON.parse(event.body);
+    // const { filePath } = JSON.parse(event.body);
 
     const authHeader = event.headers.Authorization;
 

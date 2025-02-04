@@ -1,8 +1,11 @@
 const AWS = require("aws-sdk");
 const jwt = require("jsonwebtoken"); // Ensure this is installed
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
+const s3 = new AWS.S3(); // Initialize S3 client
+
 const TABLE_NAME = process.env.TABLE_NAME;
 const JWT_SECRET = process.env.JWT_SECRET; // Ensure this is set in your Lambda environment
+const PROFILE_IMAGE_BUCKET = process.env.BUCKET_NAME;
 
 const headers = {
   "Access-Control-Allow-Origin": "*",
@@ -60,8 +63,15 @@ exports.handler = async (event) => {
       };
     }
 
+    // Generate a pre-signed URL if a profile image exists
     if (user.Item.profileImage) {
       user.Item.profileImage = decodeURIComponent(user.Item.profileImage);
+      const preSignedUrl = s3.getSignedUrl("getObject", {
+        Bucket: PROFILE_IMAGE_BUCKET,
+        Key: profileImageKey,
+        Expires: 60 * 5, // URL expires in 5 minutes
+      });
+      user.Item.profileImageUrl = preSignedUrl; // Include the pre-signed URL in the response
     }
 
     return {

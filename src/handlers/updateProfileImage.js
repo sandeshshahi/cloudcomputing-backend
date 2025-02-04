@@ -13,7 +13,9 @@ const headers = {
 
 exports.handler = async (event) => {
   try {
-    const { email, imageUrl } = JSON.parse(event.body);
+    // const { email, imageUrl } = JSON.parse(event.body);
+    const { filePath } = JSON.parse(event.body);
+
     const authHeader = event.headers.Authorization;
 
     // Check if token exists
@@ -53,7 +55,7 @@ exports.handler = async (event) => {
         TableName: TABLE_NAME,
         Key: { email },
         UpdateExpression: "SET profileImage = :img",
-        ExpressionAttributeValues: { ":img": imageUrl },
+        ExpressionAttributeValues: { ":img": filePath },
       })
       .promise();
 
@@ -62,7 +64,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         message: "Profile image updated successfully",
-        imageUrl,
+        filePath,
       }),
     };
   } catch (error) {

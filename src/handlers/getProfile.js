@@ -65,10 +65,10 @@ exports.handler = async (event) => {
 
     // Generate a pre-signed URL if a profile image exists
     if (user.Item.profileImage) {
-      user.Item.profileImage = decodeURIComponent(user.Item.profileImage);
+      // user.Item.profileImage = decodeURIComponent(user.Item.profileImage);
       const preSignedUrl = s3.getSignedUrl("getObject", {
         Bucket: PROFILE_IMAGE_BUCKET,
-        Key: profileImageKey,
+        Key: user.Item.profileImage,
         Expires: 60 * 5, // URL expires in 5 minutes
       });
       user.Item.profileImageUrl = preSignedUrl; // Include the pre-signed URL in the response

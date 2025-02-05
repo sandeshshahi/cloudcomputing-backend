@@ -1,23 +1,33 @@
 const AWS = require("aws-sdk");
-const jwt = require("jsonwebtoken"); // Ensure this is installed
+const jwt = require("jsonwebtoken");
+
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
-const s3 = new AWS.S3(); // Initialize S3 client
+const s3 = new AWS.S3();
 
 const TABLE_NAME = process.env.TABLE_NAME;
-const JWT_SECRET = process.env.JWT_SECRET; // Ensure this is set in your Lambda environment
+const JWT_SECRET = process.env.JWT_SECRET;
 const PROFILE_IMAGE_BUCKET = process.env.BUCKET_NAME;
 
 const headers = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 exports.handler = async (event) => {
-  console.log("Event received:", JSON.stringify(event, null, 2));
+  console.log("Received event:", JSON.stringify(event, null, 2));
+
+  //  Handle CORS Preflight (OPTIONS)
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ message: "CORS preflight successful" }),
+    };
+  }
 
   try {
-    // Extract token from headers
+    console.log("Extracting token...");
     const authHeader =
       event.headers?.Authorization || event.headers?.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -32,14 +42,13 @@ exports.handler = async (event) => {
     console.log("Extracted token:", token);
 
     // Verify token
-    if (!JWT_SECRET) {
-      throw new Error("JWT_SECRET is not set in environment variables");
-    }
+    if (!JWT_SECRET)
+      throw new Error("JWT_SECRET is missing in environment variables");
 
-    const decoded = jwt.verify(token, JWT_SECRET); // Verify the token
+    console.log("Verifying token...");
+    const decoded = jwt.verify(token, JWT_SECRET);
     console.log("Decoded token:", decoded);
 
-    // Ensure the token contains the email claim
     if (!decoded.email) {
       return {
         statusCode: 401,
@@ -50,10 +59,12 @@ exports.handler = async (event) => {
       };
     }
 
-    // Fetch user data from DynamoDB
+    // Fetch user from DynamoDB
+    console.log("Fetching user from DynamoDB...");
     const user = await dynamoDB
       .get({ TableName: TABLE_NAME, Key: { email: decoded.email } })
       .promise();
+    console.log("DynamoDB response:", user);
 
     if (!user.Item) {
       return {
@@ -63,40 +74,48 @@ exports.handler = async (event) => {
       };
     }
 
-    // Generate a pre-signed URL if a profile image exists
+    // Generate pre-signed URL
+
+    console.log("Generating pre-signed URL...");
+    let profileImageUrl = null; // Initialize as null
     if (user.Item.profileImage) {
-      // user.Item.profileImage = decodeURIComponent(user.Item.profileImage);
-      const preSignedUrl = s3.getSignedUrl("getObject", {
+      profileImageUrl = s3.getSignedUrl("getObject", {
         Bucket: PROFILE_IMAGE_BUCKET,
-        Key: user.Item.profileImage,
-        Expires: 60 * 5, // URL expires in 5 minutes
+        Key: user.Item.profileImage, // Use the S3 key stored in DynamoDB
+        Expires: 300, // 5 minutes
       });
-      user.Item.profileImageUrl = preSignedUrl; // Include the pre-signed URL in the response
+      console.log("Generated pre-signed URL:", profileImageUrl);
+      // user.Item.profileImageUrl = preSignedUrl;
+      // console.log("Generated pre-signed URL:", preSignedUrl);
     }
 
+    // Create a response object to avoid modifying the original user.Item
+    const responseData = {
+      email: user.Item.email,
+      name: user.Item.name,
+      createdAt: user.Item.createdAt,
+      profileImage: user.Item.profileImage,
+      profileImageUrl: profileImageUrl, // Include the pre-signed URL here
+    };
+
+    // // Decode the URL if needed
+    // let profileImageUrl = user.Item.profileImageUrl;
+    // try {
+    //   const decodedUrl = decodeURIComponent(profileImageUrl);
+    //   // Check if the decoded URL is different (i.e., was double-encoded)
+    //   if (decodedUrl !== profileImageUrl) {
+    //     profileImageUrl = decodedUrl;
+    //   }
+    // } catch (e) {
+    //   console.log("Error decoding profileImageUrl:", e);
+    // }
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(user.Item),
+      body: JSON.stringify(responseData),
     };
   } catch (error) {
-    console.error("Error:", error.message);
-
-    if (error.name === "JsonWebTokenError") {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ error: "Invalid token" }),
-      };
-    }
-
-    if (error.name === "TokenExpiredError") {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ error: "Token expired" }),
-      };
-    }
+    console.error("Error:", error);
 
     return {
       statusCode: 500,

@@ -59,6 +59,18 @@ exports.handler = async (event) => {
     };
 
     const uploadURL = await S3.getSignedUrlPromise("putObject", params);
+    console.log("presigned url:", uploadURL);
+
+    // Update the profile image URL in DynamoDB
+    await dynamoDB
+      .update({
+        TableName: TABLE_NAME,
+        Key: { email },
+        UpdateExpression: "SET profileImage = :img",
+        ExpressionAttributeValues: { ":img": key }, // Store only the S3 key
+        ReturnValues: "UPDATED_NEW",
+      })
+      .promise();
 
     return {
       statusCode: 200,
